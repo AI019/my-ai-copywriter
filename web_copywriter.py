@@ -1,0 +1,201 @@
+import streamlit as st
+import requests
+from datetime import datetime
+from docx import Document
+from io import BytesIO
+
+# 页面配置
+st.set_page_config(page_title="AI 文案生成器", page_icon="✍️")
+
+# 标题
+st.title("✍️ AI 文案生成器")
+st.caption(f"当前时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+
+# 侧边栏：API Key 设置
+with st.sidebar:
+    st.header("⚙️ 设置")
+    api_key = st.text_input("API Key", type="password", value="")
+    st.markdown("---")
+    st.caption("💡 提示：文案会保存在日志文件中，也可导出 Word 文档")
+
+# 主界面
+st.header("📝 生成文案")
+
+# 商品名称输入（支持多个，用逗号分隔）
+product = st.text_area("商品名称（多个请用逗号分隔）", placeholder="例如：无线蓝牙耳机,便携咖啡杯,智能手表", height=80)
+
+# 风格选择（8种风格）
+style = st.selectbox(
+    "选择文案风格",
+    options=["小红书种草风", "朋友圈分享风", "专业评测风", "淘宝促销风", "微博热搜风", "抖音脚本风", "知乎干货风", "英文国际风"],
+    index=0
+)
+
+# 风格对应的 prompt 映射
+def get_prompt(style, product):
+    prompts = {
+        "小红书种草风": f"""你是一个小红书种草博主，请为以下商品写一篇小红书风格的种草文案。
+
+商品：{product}
+
+要求：
+1. 标题要吸引人，带emoji
+2. 正文分3-4个卖点，每个卖点用emoji开头
+3. 语气亲切自然，像朋友推荐
+4. 结尾加上3-5个相关标签
+
+请直接输出文案，不要有其他说明。""",
+
+        "朋友圈分享风": f"""请为商品「{product}」写一段微信朋友圈风格的推荐文案。
+
+要求：
+1. 简短有力，不超过150字
+2. 语气亲切，像朋友在分享
+3. 带2-3个emoji
+4. 结尾加一句号召性的话
+
+请直接输出文案。""",
+
+        "专业评测风": f"""请为商品「{product}」写一篇专业评测风格的文案。
+
+要求：
+1. 标题客观专业
+2. 分3-4个技术/功能卖点，每个卖点有具体说明
+3. 语气中立可信
+4. 结尾给出总结和购买建议
+
+请直接输出文案。""",
+
+        "淘宝促销风": f"""请为商品「{product}」写一段淘宝详情页风格的促销文案。
+
+要求：
+1. 突出卖点和优惠
+2. 使用短句、符号分隔
+3. 语气热情有感染力
+4. 结尾加上行动呼吁（如“点击购买”）
+
+请直接输出文案。""",
+
+        "微博热搜风": f"""请为商品「{product}」写一段微博热搜风格的推荐文案。
+
+要求：
+1. 开头用“#话题#”格式，像是热搜话题
+2. 正文简短有力，不超过100字
+3. 语气像网友热议，带2-3个emoji
+4. 结尾带2-3个相关话题标签
+
+请直接输出文案。""",
+
+        "抖音脚本风": f"""请为商品「{product}」写一个抖音短视频脚本风格的文案。
+
+要求：
+1. 开头写出“【画面】”和“【文案】”
+2. 分3-4个镜头，每个镜头15字以内
+3. 最后一句是“🔥 点击购物车，同款 Get！”
+4. 整体节奏快，有冲击力
+
+请直接输出文案。""",
+
+        "知乎干货风": f"""请为商品「{product}」写一段知乎回答风格的推荐文案。
+
+要求：
+1. 开头用“谢邀”或“作为XXX用户”
+2. 正文分3-4个要点，每个要点有具体说明
+3. 语气理性、专业、可信
+4. 结尾总结并给出建议
+
+请直接输出文案。""",
+
+        "英文国际风": f"""Please write an English product description for "{product}".
+
+Requirements:
+1. Short and catchy title
+2. 3-4 bullet points highlighting key features
+3. Friendly, conversational tone
+4. End with a call to action
+
+Output in English only."""
+    }
+    return prompts.get(style, prompts["小红书种草风"])
+
+# 生成按钮
+if st.button("🚀 生成文案", type="primary"):
+    if not product:
+        st.error("请输入商品名称")
+    else:
+        # 分割商品（支持中英文逗号）
+        products = [p.strip() for p in product.replace("，", ",").split(",") if p.strip()]
+        
+        with st.spinner(f"AI 正在为 {len(products)} 个商品创作文案..."):
+            all_results = []
+            
+            for i, prod in enumerate(products):
+                prompt = get_prompt(style, prod)
+                
+                url = "https://api.siliconflow.cn/v1/chat/completions"
+                headers = {
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json"
+                }
+                data = {
+                    "model": "deepseek-ai/DeepSeek-V3",
+                    "messages": [{"role": "user", "content": prompt}],
+                    "max_tokens": 800
+                }
+                
+                response = requests.post(url, headers=headers, json=data)
+                
+                if response.status_code == 200:
+                    result = response.json()
+                    ai_reply = result["choices"][0]["message"]["content"]
+                    all_results.append((prod, ai_reply))
+                    
+                    # 实时保存到日志文件
+                    log_filename = f"/Volumes/AI_Work/Projects/copy_log_web_{datetime.now().strftime('%Y%m%d')}.txt"
+                    with open(log_filename, "a", encoding="utf-8") as f:
+                        f.write(f"\n📝 商品: {prod}\n")
+                        f.write(f"🎨 风格: {style}\n")
+                        f.write(f"📝 生成时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+                        f.write(ai_reply + "\n")
+                        f.write("-" * 50 + "\n")
+                else:
+                    all_results.append((prod, f"❌ 生成失败，状态码：{response.status_code}"))
+            
+            # 显示所有结果
+            st.success(f"✅ 成功生成 {len(all_results)} 篇文案！")
+            
+            # 导出按钮（放在结果之前）
+            if all_results:
+                # 创建 Word 文档
+                doc = Document()
+                doc.add_heading('AI 文案生成报告', 0)
+                doc.add_paragraph(f'生成时间：{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}')
+                doc.add_paragraph(f'文案风格：{style}')
+                doc.add_paragraph(f'商品数量：{len(all_results)} 个')
+                doc.add_paragraph('-' * 50)
+                
+                for prod, content in all_results:
+                    doc.add_heading(f'商品：{prod}', level=1)
+                    doc.add_paragraph(content)
+                    doc.add_page_break()
+                
+                # 保存到内存
+                doc_bytes = BytesIO()
+                doc.save(doc_bytes)
+                doc_bytes.seek(0)
+                
+                # 显示下载按钮
+                st.download_button(
+                    label="📥 下载 Word 文档",
+                    data=doc_bytes,
+                    file_name=f"文案报告_{datetime.now().strftime('%Y%m%d_%H%M%S')}.docx",
+                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                )
+                st.markdown("---")
+            
+            # 显示每个结果
+            for prod, content in all_results:
+                with st.expander(f"📦 {prod}", expanded=True):
+                    st.markdown(content)
+            
+            st.balloons()
