@@ -1,0 +1,24 @@
+import requests
+
+# 替换成你自己的 API Key
+API_KEY = "sk-gvzojjeykwdbiutvxartsqanvauatejktmprxgczeidfcyes"
+
+response = requests.post(
+    url="https://api.siliconflow.cn/v1/chat/completions",
+    headers={
+        "Authorization": f"Bearer {API_KEY}",
+        "Content-Type": "application/json"
+    },
+    json={
+        "model": "deepseek-ai/DeepSeek-V3",
+        "messages": [{"role": "user", "content": "具体介绍一下千问大模型"}],
+        "max_tokens": 500
+    }
+)
+
+print("状态码:", response.status_code)
+if response.status_code == 200:
+    result = response.json()
+    print("AI回答:", result["choices"][0]["message"]["content"])
+else:
+    print("错误信息:", response.text)
