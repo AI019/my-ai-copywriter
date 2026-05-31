@@ -15,7 +15,7 @@ st.caption(f"当前时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 with st.sidebar:
     st.header("⚙️ 设置")
     api_key = st.text_input("API Key", type="password", value="")
-    st.markdown("---")·
+    st.markdown("---")
     st.caption("💡 提示：文案会保存在日志文件中，也可导出 Word 文档")
 
 # 主界面
