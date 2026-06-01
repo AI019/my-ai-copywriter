@@ -14,10 +14,14 @@ st.caption(f"当前时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 # 侧边栏：API Key 设置
 with st.sidebar:
     st.header("⚙️ 设置")
-    api_key = st.text_input("API Key", type="password", value="")
+    # 优先从 secrets 读取，如果没有则从环境变量读取
+    api_key = st.secrets.get("API_KEY", "")
+    if not api_key:
+        api_key = st.text_input("API Key", type="password", value="", help="本地测试时手动输入")
+    else:
+        st.success("✅ API Key 已自动加载")
     st.markdown("---")
     st.caption("💡 提示：文案会保存在日志文件中，也可导出 Word 文档")
-
 # 主界面
 st.header("📝 生成文案")
 
