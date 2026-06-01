@@ -151,7 +151,7 @@ if st.button("🚀 生成文案", type="primary"):
                     all_results.append((prod, ai_reply))
                     
                     # 实时保存到日志文件
-                    log_filename = f"/Volumes/AI_Work/Projects/copy_log_web_{datetime.now().strftime('%Y%m%d')}.txt"
+                    log_filename = f"copy_log_web_{datetime.now().strftime('%Y%m%d')}.log"
                     with open(log_filename, "a", encoding="utf-8") as f:
                         f.write(f"\n📝 商品: {prod}\n")
                         f.write(f"🎨 风格: {style}\n")
