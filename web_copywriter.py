@@ -12,12 +12,40 @@ API_URL = "https://api.siliconflow.cn/v1/chat/completions"
 MODEL_OPTIONS = {
     "DeepSeek-V3": "deepseek-ai/DeepSeek-V3",
     "千问 Qwen3-8B": "Qwen/Qwen3-8B",
-    "Kimi-K2.5": "moonshotai/Kimi-K2.5",
+    "Kimi-K2.5": "Pro/moonshotai/Kimi-K2.5",
 }
 REQUEST_TIMEOUT = 60
 LOG_DIR = Path(__file__).parent
 
 
+<<<<<<< HEAD
+=======
+# 侧边栏：API Key 设置
+with st.sidebar:
+    st.header("⚙️ 设置")
+    # 优先从 secrets 读取，如果没有则从环境变量读取
+    api_key = st.secrets.get("API_KEY", "")
+    if not api_key:
+        api_key = st.text_input("API Key", type="password", value="", help="本地测试时手动输入")
+    else:
+        st.success("✅ API Key 已自动加载")
+    st.markdown("---")
+    st.caption("💡 提示：文案会保存在日志文件中，也可导出 Word 文档")
+# 主界面
+st.header("📝 生成文案")
+
+# 商品名称输入（支持多个，用逗号分隔）
+product = st.text_area("商品名称（多个请用逗号分隔）", placeholder="例如：无线蓝牙耳机,便携咖啡杯,智能手表", height=80)
+
+# 风格选择（8种风格）
+style = st.selectbox(
+    "选择文案风格",
+    options=["小红书种草风", "朋友圈分享风", "专业评测风", "淘宝促销风", "微博热搜风", "抖音脚本风", "知乎干货风", "英文国际风"],
+    index=0
+)
+
+# 风格对应的 prompt 映射
+>>>>>>> 4e34850c613b971613b920b5e35fd1b41f05a34c
 def get_prompt(style, product):
     prompts = {
         "小红书种草风": f"""你是一个小红书种草博主，请为以下商品写一篇小红书风格的种草文案。
@@ -211,6 +239,7 @@ if st.button("🚀 生成文案", type="primary"):
                     "Authorization": f"Bearer {api_key.strip()}",
                     "Content-Type": "application/json",
                 }
+<<<<<<< HEAD
 
                 for prod in products:
                     prompt = get_prompt(style, prod)
@@ -261,6 +290,36 @@ if st.button("🚀 生成文案", type="primary"):
             else:
                 st.error(f"全部失败（{fail_count} 篇），请检查 API Key 或网络")
 
+=======
+                data = {
+                    "model": "deepseek-ai/DeepSeek-V3",
+                    "messages": [{"role": "user", "content": prompt}],
+                    "max_tokens": 800
+                }
+                
+                response = requests.post(url, headers=headers, json=data)
+                
+                if response.status_code == 200:
+                    result = response.json()
+                    ai_reply = result["choices"][0]["message"]["content"]
+                    all_results.append((prod, ai_reply))
+                    
+                    # 实时保存到日志文件
+                    log_filename = f"copy_log_web_{datetime.now().strftime('%Y%m%d')}.log"
+                    with open(log_filename, "a", encoding="utf-8") as f:
+                        f.write(f"\n📝 商品: {prod}\n")
+                        f.write(f"🎨 风格: {style}\n")
+                        f.write(f"📝 生成时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+                        f.write(ai_reply + "\n")
+                        f.write("-" * 50 + "\n")
+                else:
+                    all_results.append((prod, f"❌ 生成失败，状态码：{response.status_code}"))
+            
+            # 显示所有结果
+            st.success(f"✅ 成功生成 {len(all_results)} 篇文案！")
+            
+            # 导出按钮（放在结果之前）
+>>>>>>> 4e34850c613b971613b920b5e35fd1b41f05a34c
             if all_results:
                 doc = Document()
                 doc.add_heading("AI 文案生成报告", 0)
@@ -292,6 +351,11 @@ if st.button("🚀 生成文案", type="primary"):
             for prod, content in all_results:
                 with st.expander(f"📦 {prod}", expanded=True):
                     st.markdown(content)
+<<<<<<< HEAD
 
             if ok_count and not fail_count:
                 st.balloons()
+=======
+            
+            st.balloons()
+>>>>>>> 4e34850c613b971613b920b5e35fd1b41f05a34c
