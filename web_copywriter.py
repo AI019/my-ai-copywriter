@@ -29,9 +29,10 @@ st.caption(f"当前时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
 # 模型选择
 model_label = st.selectbox(
-    "选择 AI 模型",
+    "选择 AI 模型", 
     options=list(MODEL_OPTIONS.keys()),
     index=0,
+    key="model_select"  # 添加唯一 key
 )
 model_id = MODEL_OPTIONS[model_label]
 
@@ -187,9 +188,10 @@ product = st.text_area(
 
 # 风格选择（8种风格）
 style = st.selectbox(
-    "选择文案风格",
+    "选择文案风格", 
     options=["小红书种草风", "朋友圈分享风", "专业评测风", "淘宝促销风", "微博热搜风", "抖音脚本风", "知乎干货风", "英文国际风"],
     index=0,
+    key="style_select"  # 添加唯一 key
 )
 
 # 模型选择
