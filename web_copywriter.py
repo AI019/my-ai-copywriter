@@ -18,29 +18,6 @@ REQUEST_TIMEOUT = 60
 LOG_DIR = Path(__file__).parent
 
 
-# 侧边栏：API Key 设置
-with st.sidebar:
-    st.header("⚙️ 设置")
-    # 优先从 secrets 读取，如果没有则从环境变量读取
-    api_key = st.secrets.get("API_KEY", "")
-    if not api_key:
-        api_key = st.text_input("API Key", type="password", value="", help="本地测试时手动输入")
-    else:
-        st.success("✅ API Key 已自动加载")
-    st.markdown("---")
-    st.caption("💡 提示：文案会保存在日志文件中，也可导出 Word 文档")
-# 主界面
-st.header("📝 生成文案")
-
-# 商品名称输入（支持多个，用逗号分隔）
-product = st.text_area("商品名称（多个请用逗号分隔）", placeholder="例如：无线蓝牙耳机,便携咖啡杯,智能手表", height=80)
-
-# 风格选择（8种风格）
-style = st.selectbox(
-    "选择文案风格",
-    options=["小红书种草风", "朋友圈分享风", "专业评测风", "淘宝促销风", "微博热搜风", "抖音脚本风", "知乎干货风", "英文国际风"],
-    index=0
-)
 
 # 风格对应的 prompt 映射
 # 页面配置
@@ -50,37 +27,6 @@ st.set_page_config(page_title="AI 文案生成器", page_icon="✍️")
 st.title("✍️ AI 文案生成器")
 st.caption(f"当前时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
-# 侧边栏：API Key 设置
-with st.sidebar:
-    st.header("⚙️ 设置")
-    # 优先 secrets → 环境变量 → 手动输入
-    api_key = st.secrets.get("API_KEY", "")
-    if api_key:
-        st.success("✅ API Key 已从 secrets 自动加载")
-    elif os.environ.get("API_KEY"):
-        api_key = os.environ.get("API_KEY", "")
-        st.success("✅ API Key 已从环境变量自动加载")
-    else:
-        api_key = st.text_input("API Key", type="password", value="", help="本地测试时手动输入")
-    st.markdown("---")
-    st.caption("💡 提示：文案会保存在日志文件中，也可导出 Word 文档")
-
-# 主界面
-st.header("📝 生成文案")
-
-# 商品名称输入（支持多个，用逗号分隔）
-product = st.text_area(
-    "商品名称（多个请用逗号分隔）",
-    placeholder="例如：无线蓝牙耳机,便携咖啡杯,智能手表",
-    height=80,
-)
-
-# 风格选择（8种风格）
-style = st.selectbox(
-    "选择文案风格",
-    options=["小红书种草风", "朋友圈分享风", "专业评测风", "淘宝促销风", "微博热搜风", "抖音脚本风", "知乎干货风", "英文国际风"],
-    index=0,
-)
 
 # 模型选择
 model_label = st.selectbox(
@@ -89,29 +35,6 @@ model_label = st.selectbox(
     index=0,
 )
 model_id = MODEL_OPTIONS[model_label]
-# 侧边栏：API Key 设置
-with st.sidebar:
-    st.header("⚙️ 设置")
-    # 优先从 secrets 读取，如果没有则从环境变量读取
-    api_key = st.secrets.get("API_KEY", "")
-    if not api_key:
-        api_key = st.text_input("API Key", type="password", value="", help="本地测试时手动输入")
-    else:
-        st.success("✅ API Key 已自动加载")
-    st.markdown("---")
-    st.caption("💡 提示：文案会保存在日志文件中，也可导出 Word 文档")
-# 主界面
-st.header("📝 生成文案")
-
-# 商品名称输入（支持多个，用逗号分隔）
-product = st.text_area("商品名称（多个请用逗号分隔）", placeholder="例如：无线蓝牙耳机,便携咖啡杯,智能手表", height=80)
-
-# 风格选择（8种风格）
-style = st.selectbox(
-    "选择文案风格",
-    options=["小红书种草风", "朋友圈分享风", "专业评测风", "淘宝促销风", "微博热搜风", "抖音脚本风", "知乎干货风", "英文国际风"],
-    index=0
-)
 
 # 风格对应的 prompt 映射
 def get_prompt(style, product):
@@ -238,12 +161,6 @@ def parse_api_error(response):
     return err_msg
 
 
-# 页面配置
-st.set_page_config(page_title="AI 文案生成器", page_icon="✍️")
-
-# 标题
-st.title("✍️ AI 文案生成器")
-st.caption(f"当前时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
 # 侧边栏：API Key 设置
 with st.sidebar:
