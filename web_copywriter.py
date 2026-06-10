@@ -27,15 +27,6 @@ st.title("✍️ AI 文案生成器")
 st.caption(f"当前时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
 
-# 模型选择
-model_label = st.selectbox(
-    "选择 AI 模型", 
-    options=list(MODEL_OPTIONS.keys()),
-    index=0,
-    key="model_select"  # 添加唯一 key
-)
-model_id = MODEL_OPTIONS[model_label]
-
 # 风格对应的 prompt 映射
 def get_prompt(style, product):
     prompts = {
