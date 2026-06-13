@@ -298,8 +298,6 @@ if st.button("🚀 生成文案", type="primary"):
                 with st.expander(f"📦 {prod}", expanded=True):
                     st.markdown(content)
             
-            st.balloons()
             if ok_count > 0:
                 st.balloons()
             
-            st.balloons
