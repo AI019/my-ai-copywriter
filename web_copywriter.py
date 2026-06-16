@@ -16,7 +16,7 @@ MODEL_OPTIONS = {
     "通义千问 Qwen3-8B": "Qwen/Qwen3-8B",
     "智谱 GLM-4-9B": "Zhipu/GLM-4-9B-Chat",
     "百川 Baichuan4": "Baichuan/Baichuan4",
-}
+    }
 REQUEST_TIMEOUT = 60
 LOG_DIR = Path(__file__).parent
 
