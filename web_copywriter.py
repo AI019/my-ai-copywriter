@@ -10,12 +10,10 @@ from pathlib import Path
 
 API_URL = "https://api.siliconflow.cn/v1/chat/completions"
 MODEL_OPTIONS = {
-    "DeepSeek-V3": "deepseek-ai/DeepSeek-V3",
+    "DeepSeek-V3": "deepseek-ai/DeepSeek-V3", 
     "Kimi-K2.5": "Pro/moonshotai/Kimi-K2.5",
     "通义千问 Qwen2.5-72B": "Qwen/Qwen2.5-72B-Instruct",
     "通义千问 Qwen3-8B": "Qwen/Qwen3-8B",
-    "智谱 GLM-4-9B": "Zhipu/GLM-4-9B-Chat",
-    "百川 Baichuan4": "Baichuan/Baichuan4",
     }
 REQUEST_TIMEOUT = 60
 LOG_DIR = Path(__file__).parent
