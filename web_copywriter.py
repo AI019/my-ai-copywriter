@@ -298,6 +298,17 @@ if st.button("🚀 生成文案", type="primary"):
             for prod, content in all_results:
                 with st.expander(f"📦 {prod}", expanded=True):
                     st.markdown(content)
+                    if st.button("📋 一键复制文案", key=f"copy_{prod}"):
+                        st.session_state.copied = True
+                        st.toast("✅ 文案已复制到剪贴板！")
+                        st.markdown(
+                            f"""
+                            <script>
+                            navigator.clipboard.writeText(`{content.replace('`', '\\`')}`);
+                            </script>
+                            """,
+                            unsafe_allow_html=True
+                        )
             
             if ok_count > 0:
                 st.balloons()
