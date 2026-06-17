@@ -205,14 +205,14 @@ if st.button("🚀 生成文案", type="primary"):
         if not products:
             st.error("请输入至少一个有效商品名称")
         else:
-            batch_id = datetime.now().strftime("%Y%m%d_%H%M%S")
-            with st.spinner(f"{model_label} 正在为 {len(products)} 个商品创作文案..."):
+                batch_id = datetime.now().strftime("%Y%m%d_%H%M%S")
                 all_results = []
-                ok_count = 0
-                fail_count = 0
-                log_filename = f"copy_log_web_{datetime.now().strftime('%Y%m%d')}.log"
+                with st.spinner(f"{model_label} 正在为 {len(products)} 个商品创作文案..."):
+                    ok_count = 0
+                    fail_count = 0
+                    log_filename = f"copy_log_web_{datetime.now().strftime('%Y%m%d')}.log"
 
-                headers = {
+                    headers = {
                     "Authorization": f"Bearer {api_key.strip()}",
                     "Content-Type": "application/json",
                 }
