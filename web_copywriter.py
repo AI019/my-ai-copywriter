@@ -296,9 +296,25 @@ if st.button("🚀 生成文案", type="primary"):
                 st.markdown("---")
 
             for prod, content in all_results:
-                with st.expander(f"📦 {prod}", expanded=True):
+                with st.expander(f"{prod}", expanded=True):
                     st.markdown(content)
-            
+                    
+                    # 一键复制按钮
+                    if st.button("📋 一键复制文案", key=f"copy_{prod}"):
+                        st.success("✅ 文案已复制到剪贴板！")
+                        st.text_area("复制内容", content, key=f"copy_text_{prod}", label_visibility="collapsed")
+                        st.components.v1.html(f"""
+<script>
+(function() {{
+    var textArea = document.getElementById('copy_text_{prod}');
+    if (textArea) {{
+        textArea.select();
+        document.execCommand('copy');
+    }}
+}})();
+</script>
+""", height=0)
+
             if ok_count > 0:
                 st.balloons()
             
