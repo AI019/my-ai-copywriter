@@ -267,41 +267,41 @@ if st.button("🚀 生成文案", type="primary"):
                 st.error(f"全部失败（{fail_count} 篇），请检查 API Key 或网络")
 
 
-            if all_results:
-                doc = Document()
-                doc.add_heading("AI 文案生成报告", 0)
-                doc.add_paragraph(f"生成时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-                doc.add_paragraph(f"AI 模型：{model_label}")
-                doc.add_paragraph(f"文案风格：{style}")
-                doc.add_paragraph(f"商品数量：{len(all_results)} 个（成功 {ok_count}，失败 {fail_count}）")
-                doc.add_paragraph("-" * 50)
+                if all_results:
+                    doc = Document()
+                    doc.add_heading("AI 文案生成报告", 0)
+                    doc.add_paragraph(f"生成时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+                    doc.add_paragraph(f"AI 模型：{model_label}")
+                    doc.add_paragraph(f"文案风格：{style}")
+                    doc.add_paragraph(f"商品数量：{len(all_results)} 个（成功 {ok_count}，失败 {fail_count}）")
+                    doc.add_paragraph("-" * 50)
 
-                for i, (prod, content) in enumerate(all_results):
-                    doc.add_heading(f"商品：{prod}", level=1)
-                    doc.add_paragraph(content)
-                    if i < len(all_results) - 1:
-                        doc.add_page_break()
+                    for i, (prod, content) in enumerate(all_results):
+                        doc.add_heading(f"商品：{prod}", level=1)
+                        doc.add_paragraph(content)
+                        if i < len(all_results) - 1:
+                            doc.add_page_break()
 
-                doc_bytes = BytesIO()
-                doc.save(doc_bytes)
-                doc_bytes.seek(0)
+                    doc_bytes = BytesIO()
+                    doc.save(doc_bytes)
+                    doc_bytes.seek(0)
 
-                st.download_button(
-                    label="📥 下载 Word 文档",
-                    data=doc_bytes,
-                    file_name=f"文案报告_{batch_id}.docx",
-                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                    key=f"download_{batch_id}",
-                )
-                st.markdown("---")
+                    st.download_button(
+                        label="📥 下载 Word 文档",
+                        data=doc_bytes,
+                        file_name=f"文案报告_{batch_id}.docx",
+                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                        key=f"download_{batch_id}",
+                    )
+                    st.markdown("---")
 
-                for prod, content in all_results:
-                    with st.expander(f"{prod}", expanded=True):
-                        st.markdown(content)
-                        if st.button("📋 一键复制文案", key=f"copy_{prod}"):
-                            st.success("✅ 文案已复制到剪贴板！")
-                            st.text_area("复制内容", content, key=f"copy_text_{prod}", label_visibility="collapsed")
-                            st.components.v1.html(f"""
+                    for prod, content in all_results:
+                        with st.expander(f"{prod}", expanded=True):
+                            st.markdown(content)
+                            if st.button("📋 一键复制文案", key=f"copy_{prod}"):
+                                st.success("✅ 文案已复制到剪贴板！")
+                                st.text_area("复制内容", content, key=f"copy_text_{prod}", label_visibility="collapsed")
+                                st.components.v1.html(f"""
 <script>
 (function() {{
     var textArea = document.getElementById('copy_text_{prod}');
@@ -313,7 +313,7 @@ if st.button("🚀 生成文案", type="primary"):
 </script>
 """, height=0)
 
-                if ok_count > 0:
-                    st.balloons()
+                    if ok_count > 0:
+                        st.balloons()
 
             
