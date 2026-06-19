@@ -4,6 +4,7 @@ import time
 
 import streamlit as st
 import requests
+import streamlit.components.v1 as components
 from datetime import datetime
 from docx import Document
 from io import BytesIO
@@ -154,6 +155,25 @@ def parse_api_error(response):
             "检查「用户中心 → 实名认证」与账户余额。"
         )
     return err_msg
+
+
+def copy_to_clipboard(text, key):
+    text_escaped = text.replace("\\", "\\\\").replace("'", "\\'").replace('"', '\\"').replace("\n", "\\n").replace("\r", "\\r")
+    components.html(
+        f"""
+        <script>
+        (function() {{
+            navigator.clipboard.writeText('{text_escaped}').then(function() {{
+                console.log('Copied successfully');
+            }}).catch(function(err) {{
+                console.error('Copy failed:', err);
+            }});
+        }})();
+        </script>
+        """,
+        height=0,
+        key=f"copy_script_{key}",
+    )
 
 
 # 侧边栏：API Key 设置
@@ -337,7 +357,10 @@ if st.session_state.all_results:
 
     for idx, (prod, content) in enumerate(all_results):
         with st.expander(f"📦 {prod}", expanded=True):
-            st.text_area("文案内容（选中即可复制）", value=content, height=150, key=f"text_{idx}", label_visibility="collapsed")
+            st.markdown(content)
+            if st.button(f"📋 复制文案", key=f"copy_{idx}"):
+                copy_to_clipboard(content, idx)
+                st.success("✅ 已复制到剪贴板！")
 
     if ok_count > 0:
         st.balloons()
