@@ -337,7 +337,9 @@ if st.session_state.all_results:
 
     for idx, (prod, content) in enumerate(all_results):
         with st.expander(f"📦 {prod}", expanded=True):
-            st.code(content, language="markdown")
+            st.markdown(content)
+            st.caption("👆 点击下方代码块右上角按钮复制原文")
+            st.code(content)
 
     if ok_count > 0:
         st.balloons()
