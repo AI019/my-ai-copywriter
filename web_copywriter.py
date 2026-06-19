@@ -312,9 +312,11 @@ if st.button("🚀 生成文案", type="primary"):
                 )
                 st.markdown("---")
 
-            for prod, content in all_results:
+            for idx, (prod, content) in enumerate(all_results):
                 with st.expander(f"📦 {prod}", expanded=True):
                     st.markdown(content)
+                    st.caption("点击代码块右上角复制按钮即可复制")
+                    st.code(content, language="markdown", line_numbers=False)
             
             if ok_count > 0:
                 st.balloons()
