@@ -4,7 +4,6 @@ import time
 
 import streamlit as st
 import requests
-import pyperclip
 from datetime import datetime
 from docx import Document
 from io import BytesIO
@@ -338,10 +337,7 @@ if st.session_state.all_results:
 
     for idx, (prod, content) in enumerate(all_results):
         with st.expander(f"📦 {prod}", expanded=True):
-            st.markdown(content)
-            if st.button(f"� 复制「{prod}」", key=f"copy_{idx}"):
-                pyperclip.copy(content)
-                st.success("✅ 已复制到剪贴板！")
+            st.text_area("文案内容（选中即可复制）", value=content, height=150, key=f"text_{idx}", label_visibility="collapsed")
 
     if ok_count > 0:
         st.balloons()
