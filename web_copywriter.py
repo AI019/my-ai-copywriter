@@ -158,21 +158,15 @@ def parse_api_error(response):
 
 
 def copy_to_clipboard(text, key):
-    text_escaped = text.replace("\\", "\\\\").replace("'", "\\'").replace('"', '\\"').replace("\n", "\\n").replace("\r", "\\r")
+    import json
+    text_json = json.dumps(text)
     components.html(
         f"""
         <script>
-        (function() {{
-            navigator.clipboard.writeText('{text_escaped}').then(function() {{
-                console.log('Copied successfully');
-            }}).catch(function(err) {{
-                console.error('Copy failed:', err);
-            }});
-        }})();
+        navigator.clipboard.writeText({text_json});
         </script>
         """,
         height=0,
-        key=f"copy_script_{key}",
     )
 
 
