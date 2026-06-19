@@ -7,6 +7,7 @@ import streamlit as st
 import requests
 from datetime import datetime
 from docx import Document
+from docx.shared import Pt
 from io import BytesIO
 from pathlib import Path
 
@@ -333,13 +334,15 @@ if st.session_state.all_results:
             else:
                 # 处理加粗
                 p = doc.add_paragraph()
-                parts = re.split(r'(\*\*[^*]+\*\*)', line)
+                parts = re.split(r'(\*\*.*?\*\*)', line)
                 for part in parts:
                     if part.startswith('**') and part.endswith('**'):
                         run = p.add_run(part[2:-2])
                         run.bold = True
+                        run.font.size = Pt(14)  # 加大字体
                     elif part:
-                        p.add_run(part)
+                        run = p.add_run(part)
+                        run.font.size = Pt(12)  # 正常字体
         
         if i < len(all_results) - 1:
             doc.add_page_break()
