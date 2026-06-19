@@ -4,6 +4,7 @@ import time
 
 import streamlit as st
 import requests
+import streamlit.components.v1 as components
 from datetime import datetime
 from docx import Document
 from io import BytesIO
@@ -154,6 +155,27 @@ def parse_api_error(response):
             "检查「用户中心 → 实名认证」与账户余额。"
         )
     return err_msg
+
+
+def copy_to_clipboard(text):
+    """使用JavaScript实现复制到剪贴板功能"""
+    components.html(
+        f"""
+        <script>
+        async function copyText() {{
+            try {{
+                await navigator.clipboard.writeText(`{text.replace('`', '` + "`" + `')}`);
+                alert('✅ 已复制到剪贴板！');
+            }} catch (err) {{
+                console.error('复制失败:', err);
+            }}
+        }}
+        copyText();
+        </script>
+        """,
+        height=0,
+        scrolling=False,
+    )
 
 
 # 侧边栏：API Key 设置
@@ -314,9 +336,8 @@ if st.button("🚀 生成文案", type="primary"):
 
             for idx, (prod, content) in enumerate(all_results):
                 with st.expander(f"📦 {prod}", expanded=True):
-                    st.markdown(content)
-                    st.caption("点击代码块右上角复制按钮即可复制")
-                    st.code(content, language="markdown", line_numbers=False)
+                    if st.button(f"📋 一键复制「{prod}」", key=f"copy_{batch_id}_{idx}"):
+                        copy_to_clipboard(content)
             
             if ok_count > 0:
                 st.balloons()
