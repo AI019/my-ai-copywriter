@@ -336,7 +336,8 @@ if st.button("🚀 生成文案", type="primary"):
 
             for idx, (prod, content) in enumerate(all_results):
                 with st.expander(f"📦 {prod}", expanded=True):
-                    if st.button(f"📋 一键复制「{prod}」", key=f"copy_{batch_id}_{idx}"):
+                    st.markdown(content)
+                    if st.button(f"📋 复制文案", key=f"copy_{batch_id}_{idx}"):
                         copy_to_clipboard(content)
             
             if ok_count > 0:
