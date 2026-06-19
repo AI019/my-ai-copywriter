@@ -156,6 +156,67 @@ def parse_api_error(response):
     return err_msg
 
 
+def add_markdown_to_doc(doc, text):
+    """将markdown文本添加到Word文档，处理常见格式"""
+    import re
+    from docx.shared import Pt
+    from docx.enum.text import WD_PARAGRAPH_ALIGNMENT
+    
+    lines = text.split('\n')
+    
+    for line in lines:
+        line = line.strip()
+        if not line:
+            doc.add_paragraph()
+            continue
+        
+        # 处理标题
+        heading_match = re.match(r'^(#{1,6})\s+(.*)', line)
+        if heading_match:
+            level = len(heading_match.group(1))
+            heading_text = heading_match.group(2)
+            doc.add_heading(heading_text, level=level)
+            continue
+        
+        # 处理水平线
+        if re.match(r'^-{3,}$|^\*{3,}$', line):
+            doc.add_paragraph("─" * 30)
+            continue
+        
+        # 处理无序列表
+        list_match = re.match(r'^[-*]\s+(.*)', line)
+        if list_match:
+            item_text = list_match.group(1)
+            p = doc.add_paragraph(style='List Bullet')
+            add_formatted_text(p, item_text)
+            continue
+        
+        # 普通段落，处理加粗和斜体
+        p = doc.add_paragraph()
+        add_formatted_text(p, line)
+
+
+def add_formatted_text(paragraph, text):
+    """处理段落中的加粗和斜体"""
+    import re
+    from docx.shared import Pt
+    
+    # 分割加粗和斜体标记
+    parts = re.split(r'(\*\*[^*]+\*\*|\*[^*]+\*)', text)
+    
+    for part in parts:
+        if part.startswith('**') and part.endswith('**'):
+            # 加粗
+            run = paragraph.add_run(part[2:-2])
+            run.bold = True
+        elif part.startswith('*') and part.endswith('*'):
+            # 斜体
+            run = paragraph.add_run(part[1:-1])
+            run.italic = True
+        elif part:
+            paragraph.add_run(part)
+
+
 # 侧边栏：API Key 设置
 with st.sidebar:
     st.header("⚙️ 设置")
@@ -318,7 +379,7 @@ if st.session_state.all_results:
 
     for i, (prod, content) in enumerate(all_results):
         doc.add_heading(f"商品：{prod}", level=1)
-        doc.add_paragraph(content)
+        add_markdown_to_doc(doc, content)
         if i < len(all_results) - 1:
             doc.add_page_break()
 
