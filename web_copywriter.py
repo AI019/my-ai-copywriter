@@ -337,8 +337,6 @@ if st.session_state.all_results:
 
     for idx, (prod, content) in enumerate(all_results):
         with st.expander(f"📦 {prod}", expanded=True):
-            st.markdown(content)
-            st.caption("� 点击下方代码块右上角复制按钮即可复制")
             st.code(content, language="markdown")
 
     if ok_count > 0:
