@@ -1,5 +1,6 @@
 # 由 Cline 协助修改
 import os
+import time
 
 import streamlit as st
 import requests
@@ -9,9 +10,11 @@ from io import BytesIO
 from pathlib import Path
 
 API_URL = "https://api.siliconflow.cn/v1/chat/completions"
+MAX_RETRIES = 3
+RETRY_DELAY = 2
 MODEL_OPTIONS = {
     "DeepSeek-V3": "deepseek-ai/DeepSeek-V3", 
-    "Kimi-K2.5": "Pro/moonshotai/Kimi-K2.5",
+    "Kimi-Moonshot": "moonshot/moonshot-v1",
     "通义千问 Qwen2.5-72B": "Qwen/Qwen2.5-72B-Instruct",
     "通义千问 Qwen3-8B": "Qwen/Qwen3-8B",
     }
@@ -225,36 +228,50 @@ if st.button("🚀 生成文案", type="primary"):
                         "max_tokens": 800,
                     }
 
-                    try:
-                        response = requests.post(
-                            API_URL,
-                            headers=headers,
-                            json=data,
-                            timeout=REQUEST_TIMEOUT,
-                        )
-                    except requests.RequestException as e:
-                        err_msg = f"❌ 网络请求失败：{e}"
-                        all_results.append((prod, err_msg))
-                        append_copy_log(log_filename, prod, style, model_label, err_msg)
-                        fail_count += 1
-                        continue
+                    response = None
+                    last_exception = None
+                    success = False
 
-                    if response.status_code == 200:
+                    for attempt in range(MAX_RETRIES):
+                        try:
+                            response = requests.post(
+                                API_URL,
+                                headers=headers,
+                                json=data,
+                                timeout=REQUEST_TIMEOUT,
+                            )
+                            if response.status_code == 200:
+                                success = True
+                                break
+                            elif response.status_code in [500, 502, 503, 504]:
+                                time.sleep(RETRY_DELAY * (attempt + 1))
+                                continue
+                            else:
+                                break
+                        except requests.RequestException as e:
+                            last_exception = e
+                            if attempt < MAX_RETRIES - 1:
+                                time.sleep(RETRY_DELAY * (attempt + 1))
+                                continue
+                            break
+
+                    if success:
                         try:
                             result = response.json()
                             ai_reply = result["choices"][0]["message"]["content"]
+                            all_results.append((prod, ai_reply))
+                            append_copy_log(log_filename, prod, style, model_label, ai_reply)
+                            ok_count += 1
                         except (KeyError, IndexError, TypeError, ValueError) as e:
                             err_msg = f"❌ 响应解析失败：{e}"
                             all_results.append((prod, err_msg))
                             append_copy_log(log_filename, prod, style, model_label, err_msg)
                             fail_count += 1
-                            continue
-
-                        all_results.append((prod, ai_reply))
-                        append_copy_log(log_filename, prod, style, model_label, ai_reply)
-                        ok_count += 1
                     else:
-                        err_msg = parse_api_error(response)
+                        if response is not None:
+                            err_msg = parse_api_error(response)
+                        else:
+                            err_msg = f"❌ 网络请求失败：{last_exception}"
                         all_results.append((prod, err_msg))
                         append_copy_log(log_filename, prod, style, model_label, err_msg)
                         fail_count += 1
