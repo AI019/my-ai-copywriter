@@ -14,7 +14,7 @@ MAX_RETRIES = 3
 RETRY_DELAY = 2
 MODEL_OPTIONS = {
     "DeepSeek-V3": "deepseek-ai/DeepSeek-V3", 
-    "Kimi-Moonshot": "moonshot/moonshot-v1",
+    "Kimi-K2.5": "Pro/moonshotai/Kimi-K2.5",
     "通义千问 Qwen2.5-72B": "Qwen/Qwen2.5-72B-Instruct",
     "通义千问 Qwen3-8B": "Qwen/Qwen3-8B",
     }
