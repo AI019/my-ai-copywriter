@@ -83,12 +83,33 @@ def call_api(api_key, model_id, prompt, max_tokens=1000):
             return f"❌ 网络错误：{e}"
 
 
-def get_plan_prompt(style, product):
-    """规划阶段提示词"""
-    return f"""你是一个专业的文案策划师。请为以下商品规划文案生成步骤。
+def get_info_gathering_prompt(style, product):
+    """信息收集阶段提示词"""
+    return f"""你是一个专业的文案策划师。请判断生成以下商品的文案是否需要更多信息。
 
 商品：{product}
 风格：{style}
+
+请判断：仅根据商品名称，是否有足够的信息来撰写高质量的文案？
+
+如果信息不足，请生成1-2个问题来获取更多信息（如目标用户、价格区间、核心卖点、使用场景等）。
+
+请严格按照以下JSON格式输出：
+{{
+    "sufficient": true或false,
+    "questions": ["问题1", "问题2"] 或 []
+}}
+
+只输出JSON，不要其他内容。"""
+
+
+def get_plan_prompt(style, product, user_answers=""):
+    """规划阶段提示词"""
+    answers_section = f"\n用户补充信息：\n{user_answers}" if user_answers else ""
+    return f"""你是一个专业的文案策划师。请为以下商品规划文案生成步骤。
+
+商品：{product}
+风格：{style}{answers_section}
 
 请输出：
 1. 核心卖点（3-4个）
@@ -147,11 +168,12 @@ st.caption(f"当前时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
 
 # 风格对应的 prompt 映射
-def get_prompt(style, product):
+def get_prompt(style, product, user_answers=""):
+    answers_section = f"\n\n用户补充信息：\n{user_answers}" if user_answers else ""
     prompts = {
         "小红书种草风": f"""你是一个小红书种草博主，请为以下商品写一篇小红书风格的种草文案。
 
-商品：{product}
+商品：{product}{answers_section}
 
 要求：
 1. 标题要吸引人，带emoji
@@ -163,6 +185,8 @@ def get_prompt(style, product):
 
         "朋友圈分享风": f"""请为商品「{product}」写一段微信朋友圈风格的推荐文案。
 
+{answers_section}
+
 要求：
 1. 简短有力，不超过150字
 2. 语气亲切，像朋友在分享
@@ -172,6 +196,8 @@ def get_prompt(style, product):
 请直接输出文案。""",
 
         "专业评测风": f"""请为商品「{product}」写一篇专业评测风格的文案。
+
+{answers_section}
 
 要求：
 1. 标题客观专业
@@ -183,6 +209,8 @@ def get_prompt(style, product):
 
         "淘宝促销风": f"""请为商品「{product}」写一段淘宝详情页风格的促销文案。
 
+{answers_section}
+
 要求：
 1. 突出卖点和优惠
 2. 使用短句、符号分隔
@@ -192,6 +220,8 @@ def get_prompt(style, product):
 请直接输出文案。""",
 
         "微博热搜风": f"""请为商品「{product}」写一段微博热搜风格的推荐文案。
+
+{answers_section}
 
 要求：
 1. 开头用"#话题#"格式，像是热搜话题
@@ -203,6 +233,8 @@ def get_prompt(style, product):
 
         "抖音脚本风": f"""请为商品「{product}」写一个抖音短视频脚本风格的文案。
 
+{answers_section}
+
 要求：
 1. 开头写出"【画面】"和"【文案】"
 2. 分3-4个镜头，每个镜头15字以内
@@ -213,6 +245,8 @@ def get_prompt(style, product):
 
         "知乎干货风": f"""请为商品「{product}」写一段知乎回答风格的推荐文案。
 
+{answers_section}
+
 要求：
 1. 开头用"谢邀"或"作为XXX用户"
 2. 正文分3-4个要点，每个要点有具体说明
@@ -222,6 +256,8 @@ def get_prompt(style, product):
 请直接输出文案。""",
 
         "英文国际风": f"""Please write an English product description for "{product}".
+
+Additional information:{answers_section}
 
 Requirements:
 1. Short and catchy title
@@ -299,6 +335,17 @@ if "ok_count" not in st.session_state:
     st.session_state.ok_count = 0
 if "fail_count" not in st.session_state:
     st.session_state.fail_count = 0
+if "qa_state" not in st.session_state:
+    st.session_state.qa_state = {
+        "products": [],
+        "current_idx": 0,
+        "questions": [],
+        "answers": {},
+        "style": "",
+        "model_id": "",
+        "model_label": "",
+        "batch_id": ""
+    }
 
 # 生成按钮
 if st.button("🚀 生成文案", type="primary"):
@@ -311,94 +358,173 @@ if st.button("🚀 生成文案", type="primary"):
         if not products:
             st.error("请输入至少一个有效商品名称")
         else:
-            batch_id = datetime.now().strftime("%Y%m%d_%H%M%S")
-            all_results = []
-            agent_info = []
-            ok_count = 0
-            fail_count = 0
-            log_filename = f"copy_log_web_{datetime.now().strftime('%Y%m%d')}.log"
+            st.session_state.qa_state = {
+                "products": products,
+                "current_idx": 0,
+                "questions": [],
+                "answers": {},
+                "style": style,
+                "model_id": model_id,
+                "model_label": model_label,
+                "batch_id": datetime.now().strftime("%Y%m%d_%H%M%S")
+            }
+            st.session_state.all_results = None
 
-            for prod in products:
-                with st.status(f"🤖 正在处理「{prod}」...", expanded=True) as status:
-                    # 阶段1：规划
-                    st.write("🧠 规划中...")
-                    plan = call_api(api_key, model_id, get_plan_prompt(style, prod), max_tokens=300)
-                    st.write(f"📋 规划完成：{plan[:50]}...")
 
-                    # 阶段2：生成
-                    st.write("✍️ 生成中...")
-                    prompt = get_prompt(style, prod)
-                    content = call_api(api_key, model_id, prompt, max_tokens=1000)
-                    if content.startswith("❌"):
-                        status.update(label=f"❌ 「{prod}」生成失败", state="error")
-                        all_results.append((prod, content))
-                        agent_info.append({"plan": plan, "score": 0, "rewrite_count": 0, "feedback": ""})
-                        append_copy_log(log_filename, prod, style, model_label, content)
-                        fail_count += 1
-                        continue
-
-                    # 阶段3：评估与重写循环
-                    rewrite_count = 0
-                    eval_score = 0
-                    feedback = ""
-                    passed = False
-
-                    while rewrite_count < MAX_REWRITE_ATTEMPTS and not passed:
-                        st.write("🔍 评估中...")
-                        eval_result = call_api(api_key, model_id, get_eval_prompt(style, prod, content), max_tokens=300)
-                        
-                        if eval_result.startswith("❌"):
-                            passed = True
-                            break
-                        
-                        try:
-                            eval_data = eval_result.replace("```json", "").replace("```", "").strip()
-                            eval_obj = json.loads(eval_data)
-                            eval_score = eval_obj.get("score", 0)
-                            passed = eval_obj.get("pass", False)
-                            feedback = eval_obj.get("feedback", "")
-                        except:
-                            passed = True
-
-                        if passed:
-                            st.write(f"✅ 评估通过（分数：{eval_score}）")
-                            break
-
-                        rewrite_count += 1
-                        st.write(f"🔄 重写中（第 {rewrite_count} 次）...")
-                        content = call_api(api_key, model_id, get_rewrite_prompt(style, prod, content, feedback), max_tokens=1000)
-                        if content.startswith("❌"):
-                            break
-
-                    if rewrite_count > 0:
-                        st.write(f"📝 共重写 {rewrite_count} 次")
-                    status.update(label=f"✅ 「{prod}」完成", state="complete")
-
-                    all_results.append((prod, content))
-                    agent_info.append({
-                        "plan": plan,
-                        "score": eval_score,
-                        "rewrite_count": rewrite_count,
-                        "feedback": feedback
-                    })
-                    append_copy_log(log_filename, prod, style, model_label, content)
-                    ok_count += 1
-
-            # 保存到 session_state
-            st.session_state.all_results = all_results
-            st.session_state.agent_info = agent_info
-            st.session_state.ok_count = ok_count
-            st.session_state.fail_count = fail_count
-            st.session_state.batch_id = batch_id
-            st.session_state.model_label = model_label
-            st.session_state.style = style
-
-            if ok_count and not fail_count:
-                st.success(f"✅ 成功生成 {ok_count} 篇文案！")
-            elif ok_count and fail_count:
-                st.warning(f"完成：成功 {ok_count} 篇，失败 {fail_count} 篇")
+# 问答阶段
+qa_state = st.session_state.qa_state
+if qa_state["products"] and not st.session_state.all_results:
+    products = qa_state["products"]
+    current_idx = qa_state["current_idx"]
+    current_prod = products[current_idx] if current_idx < len(products) else ""
+    
+    if current_prod and not qa_state["questions"]:
+        with st.status(f"❓ 正在分析「{current_prod}」的信息需求...", expanded=True) as status:
+            st.write("🔍 判断信息是否充足...")
+            info_result = call_api(api_key, qa_state["model_id"], get_info_gathering_prompt(qa_state["style"], current_prod), max_tokens=300)
+            
+            if info_result.startswith("❌"):
+                st.error(f"信息分析失败：{info_result}")
+                st.session_state.qa_state["questions"] = []
+                st.session_state.qa_state["answers"][current_prod] = ""
             else:
-                st.error(f"全部失败（{fail_count} 篇），请检查 API Key 或网络")
+                try:
+                    info_data = info_result.replace("```json", "").replace("```", "").strip()
+                    info_obj = json.loads(info_data)
+                    sufficient = info_obj.get("sufficient", True)
+                    questions = info_obj.get("questions", [])
+                    
+                    if sufficient or not questions:
+                        st.write("✅ 信息充足，直接进入生成")
+                        st.session_state.qa_state["questions"] = []
+                        st.session_state.qa_state["answers"][current_prod] = ""
+                    else:
+                        st.write(f"❓ 需要补充 {len(questions)} 个问题")
+                        st.session_state.qa_state["questions"] = questions
+                except:
+                    st.write("✅ 默认信息充足")
+                    st.session_state.qa_state["questions"] = []
+                    st.session_state.qa_state["answers"][current_prod] = ""
+    
+    if qa_state["questions"]:
+        st.subheader(f"❓ 请回答关于「{current_prod}」的问题")
+        answers = []
+        for i, q in enumerate(qa_state["questions"], 1):
+            answer = st.text_input(f"问题 {i}: {q}", key=f"qa_{current_idx}_{i}")
+            answers.append((q, answer))
+        
+        if st.button(f"✅ 确认答案并继续", key=f"qa_next_{current_idx}"):
+            user_answers_text = "\n".join([f"Q: {q}\nA: {a}" for q, a in answers])
+            st.session_state.qa_state["answers"][current_prod] = user_answers_text
+            
+            if current_idx < len(products) - 1:
+                st.session_state.qa_state["current_idx"] = current_idx + 1
+                st.session_state.qa_state["questions"] = []
+                st.rerun()
+            else:
+                st.session_state.qa_state["questions"] = []
+                st.session_state.qa_state["current_idx"] = len(products)
+    elif current_prod and not qa_state["questions"]:
+        if current_idx < len(products):
+            if current_idx < len(products) - 1:
+                st.session_state.qa_state["current_idx"] = current_idx + 1
+                st.session_state.qa_state["questions"] = []
+                st.rerun()
+            else:
+                st.session_state.qa_state["current_idx"] = len(products)
+
+
+# 信息收集完成，开始生成
+if qa_state["products"] and qa_state["current_idx"] >= len(qa_state["products"]) and not st.session_state.all_results:
+    all_results = []
+    agent_info = []
+    ok_count = 0
+    fail_count = 0
+    log_filename = f"copy_log_web_{datetime.now().strftime('%Y%m%d')}.log"
+
+    for prod in qa_state["products"]:
+        user_answers = qa_state["answers"].get(prod, "")
+        with st.status(f"🤖 正在处理「{prod}」...", expanded=True) as status:
+            # 阶段1：规划
+            st.write("🧠 规划中...")
+            plan = call_api(api_key, qa_state["model_id"], get_plan_prompt(qa_state["style"], prod, user_answers), max_tokens=300)
+            st.write(f"📋 规划完成：{plan[:50]}...")
+
+            # 阶段2：生成
+            st.write("✍️ 生成中...")
+            prompt = get_prompt(qa_state["style"], prod, user_answers)
+            content = call_api(api_key, qa_state["model_id"], prompt, max_tokens=1000)
+            if content.startswith("❌"):
+                status.update(label=f"❌ 「{prod}」生成失败", state="error")
+                all_results.append((prod, content))
+                agent_info.append({"plan": plan, "score": 0, "rewrite_count": 0, "feedback": "", "user_answers": user_answers})
+                append_copy_log(log_filename, prod, qa_state["style"], qa_state["model_label"], content)
+                fail_count += 1
+                continue
+
+            # 阶段3：评估与重写循环
+            rewrite_count = 0
+            eval_score = 0
+            feedback = ""
+            passed = False
+
+            while rewrite_count < MAX_REWRITE_ATTEMPTS and not passed:
+                st.write("🔍 评估中...")
+                eval_result = call_api(api_key, qa_state["model_id"], get_eval_prompt(qa_state["style"], prod, content), max_tokens=300)
+                
+                if eval_result.startswith("❌"):
+                    passed = True
+                    break
+                
+                try:
+                    eval_data = eval_result.replace("```json", "").replace("```", "").strip()
+                    eval_obj = json.loads(eval_data)
+                    eval_score = eval_obj.get("score", 0)
+                    passed = eval_obj.get("pass", False)
+                    feedback = eval_obj.get("feedback", "")
+                except:
+                    passed = True
+
+                if passed:
+                    st.write(f"✅ 评估通过（分数：{eval_score}）")
+                    break
+
+                rewrite_count += 1
+                st.write(f"🔄 重写中（第 {rewrite_count} 次）...")
+                content = call_api(api_key, qa_state["model_id"], get_rewrite_prompt(qa_state["style"], prod, content, feedback), max_tokens=1000)
+                if content.startswith("❌"):
+                    break
+
+            if rewrite_count > 0:
+                st.write(f"📝 共重写 {rewrite_count} 次")
+            status.update(label=f"✅ 「{prod}」完成", state="complete")
+
+            all_results.append((prod, content))
+            agent_info.append({
+                "plan": plan,
+                "score": eval_score,
+                "rewrite_count": rewrite_count,
+                "feedback": feedback,
+                "user_answers": user_answers
+            })
+            append_copy_log(log_filename, prod, qa_state["style"], qa_state["model_label"], content)
+            ok_count += 1
+
+    # 保存到 session_state
+    st.session_state.all_results = all_results
+    st.session_state.agent_info = agent_info
+    st.session_state.ok_count = ok_count
+    st.session_state.fail_count = fail_count
+    st.session_state.batch_id = qa_state["batch_id"]
+    st.session_state.model_label = qa_state["model_label"]
+    st.session_state.style = qa_state["style"]
+
+    if ok_count and not fail_count:
+        st.success(f"✅ 成功生成 {ok_count} 篇文案！")
+    elif ok_count and fail_count:
+        st.warning(f"完成：成功 {ok_count} 篇，失败 {fail_count} 篇")
+    else:
+        st.error(f"全部失败（{fail_count} 篇），请检查 API Key 或网络")
 
 # 显示结果（从 session_state 读取）
 if st.session_state.all_results:
@@ -465,6 +591,9 @@ if st.session_state.all_results:
                 info = st.session_state.agent_info[idx]
                 st.markdown(f"**📊 评估分数：{info['score']}/15**")
                 st.markdown(f"**🔄 重写次数：{info['rewrite_count']}次**")
+                if info.get('user_answers'):
+                    with st.expander("💬 用户补充信息"):
+                        st.markdown(info['user_answers'])
                 if info['plan'] and not info['plan'].startswith("❌"):
                     with st.expander("📋 规划摘要"):
                         st.markdown(info['plan'])
