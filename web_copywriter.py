@@ -1,6 +1,7 @@
 # 由 Cline 协助修改
 import os
 import re
+import json
 import time
 
 import streamlit as st
@@ -23,6 +24,28 @@ MODEL_OPTIONS = {
 REQUEST_TIMEOUT = 60
 LOG_DIR = Path(__file__).parent
 MAX_REWRITE_ATTEMPTS = 3
+
+
+def parse_api_error(response):
+    err_msg = f"❌ 生成失败，状态码：{response.status_code}"
+    detail = ""
+    try:
+        body = response.json()
+        if isinstance(body.get("error"), dict):
+            detail = body["error"].get("message", "")
+        if not detail:
+            detail = body.get("message", "")
+    except ValueError:
+        detail = response.text[:300].strip()
+    if detail:
+        err_msg += f"\n详情：{detail}"
+    if response.status_code == 403:
+        err_msg += (
+            "\n\n💡 Kimi 等部分模型需 SiliconFlow 账户完成实名认证，"
+            "且 API Key 须来自已认证账户。请登录 https://cloud.siliconflow.cn "
+            "检查「用户中心 → 实名认证」与账户余额。"
+        )
+    return err_msg
 
 
 def call_api(api_key, model_id, prompt, max_tokens=1000):
@@ -52,7 +75,7 @@ def call_api(api_key, model_id, prompt, max_tokens=1000):
                 time.sleep(RETRY_DELAY * (attempt + 1))
                 continue
             else:
-                return f"❌ API错误：{response.status_code}"
+                return parse_api_error(response)
         except requests.RequestException as e:
             if attempt < MAX_RETRIES - 1:
                 time.sleep(RETRY_DELAY * (attempt + 1))
@@ -226,28 +249,6 @@ def append_copy_log(log_filename, prod, style, model_name, body):
         st.warning(f"日志写入失败（{prod}）：{e}")
 
 
-def parse_api_error(response):
-    err_msg = f"❌ 生成失败，状态码：{response.status_code}"
-    detail = ""
-    try:
-        body = response.json()
-        if isinstance(body.get("error"), dict):
-            detail = body["error"].get("message", "")
-        if not detail:
-            detail = body.get("message", "")
-    except ValueError:
-        detail = response.text[:300].strip()
-    if detail:
-        err_msg += f"\n详情：{detail}"
-    if response.status_code == 403:
-        err_msg += (
-            "\n\n💡 Kimi 等部分模型需 SiliconFlow 账户完成实名认证，"
-            "且 API Key 须来自已认证账户。请登录 https://cloud.siliconflow.cn "
-            "检查「用户中心 → 实名认证」与账户余额。"
-        )
-    return err_msg
-
-
 # 侧边栏：API Key 设置
 with st.sidebar:
     st.header("⚙️ 设置")
@@ -292,6 +293,8 @@ model_id = MODEL_OPTIONS[model_label]
 # 初始化 session_state
 if "all_results" not in st.session_state:
     st.session_state.all_results = None
+if "agent_info" not in st.session_state:
+    st.session_state.agent_info = []
 if "ok_count" not in st.session_state:
     st.session_state.ok_count = 0
 if "fail_count" not in st.session_state:
@@ -344,11 +347,13 @@ if st.button("🚀 生成文案", type="primary"):
                         st.write("🔍 评估中...")
                         eval_result = call_api(api_key, model_id, get_eval_prompt(style, prod, content), max_tokens=300)
                         
+                        if eval_result.startswith("❌"):
+                            passed = True
+                            break
+                        
                         try:
                             eval_data = eval_result.replace("```json", "").replace("```", "").strip()
-                            eval_json = eval_data
-                            import json
-                            eval_obj = json.loads(eval_json)
+                            eval_obj = json.loads(eval_data)
                             eval_score = eval_obj.get("score", 0)
                             passed = eval_obj.get("pass", False)
                             feedback = eval_obj.get("feedback", "")
