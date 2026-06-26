@@ -22,6 +22,96 @@ MODEL_OPTIONS = {
     }
 REQUEST_TIMEOUT = 60
 LOG_DIR = Path(__file__).parent
+MAX_REWRITE_ATTEMPTS = 3
+
+
+def call_api(api_key, model_id, prompt, max_tokens=1000):
+    """通用API调用函数"""
+    headers = {
+        "Authorization": f"Bearer {api_key.strip()}",
+        "Content-Type": "application/json",
+    }
+    data = {
+        "model": model_id,
+        "messages": [{"role": "user", "content": prompt}],
+        "max_tokens": max_tokens,
+    }
+    
+    for attempt in range(MAX_RETRIES):
+        try:
+            response = requests.post(
+                API_URL,
+                headers=headers,
+                json=data,
+                timeout=REQUEST_TIMEOUT,
+            )
+            if response.status_code == 200:
+                result = response.json()
+                return result["choices"][0]["message"]["content"]
+            elif response.status_code in [500, 502, 503, 504]:
+                time.sleep(RETRY_DELAY * (attempt + 1))
+                continue
+            else:
+                return f"❌ API错误：{response.status_code}"
+        except requests.RequestException as e:
+            if attempt < MAX_RETRIES - 1:
+                time.sleep(RETRY_DELAY * (attempt + 1))
+                continue
+            return f"❌ 网络错误：{e}"
+
+
+def get_plan_prompt(style, product):
+    """规划阶段提示词"""
+    return f"""你是一个专业的文案策划师。请为以下商品规划文案生成步骤。
+
+商品：{product}
+风格：{style}
+
+请输出：
+1. 核心卖点（3-4个）
+2. 文案结构规划
+3. 目标受众分析
+
+请以清晰的列表形式输出，不要超过100字。"""
+
+
+def get_eval_prompt(style, product, content):
+    """评估阶段提示词"""
+    return f"""你是一个专业的文案评估师。请评估以下文案的质量。
+
+商品：{product}
+风格：{style}
+文案内容：
+{content}
+
+评估标准：
+1. 风格匹配度（0-5分）：是否符合指定风格
+2. 说服力（0-5分）：是否能打动目标用户
+3. 完整性（0-5分）：是否包含所有必要信息
+
+请严格按照以下JSON格式输出：
+{{
+    "score": 总分,
+    "pass": true或false（总分>=10为pass）,
+    "feedback": "具体改进建议"
+}}
+
+只输出JSON，不要其他内容。"""
+
+
+def get_rewrite_prompt(style, product, content, feedback):
+    """重写阶段提示词"""
+    return f"""请根据以下反馈重写文案。
+
+商品：{product}
+风格：{style}
+原文案：
+{content}
+
+改进建议：
+{feedback}
+
+请根据建议进行优化重写，保持风格一致。直接输出新文案。"""
 
 
 # 风格对应的 prompt 映射
@@ -219,75 +309,79 @@ if st.button("🚀 生成文案", type="primary"):
             st.error("请输入至少一个有效商品名称")
         else:
             batch_id = datetime.now().strftime("%Y%m%d_%H%M%S")
-            with st.spinner(f"{model_label} 正在为 {len(products)} 个商品创作文案..."):
-                all_results = []
-                ok_count = 0
-                fail_count = 0
-                log_filename = f"copy_log_web_{datetime.now().strftime('%Y%m%d')}.log"
+            all_results = []
+            agent_info = []
+            ok_count = 0
+            fail_count = 0
+            log_filename = f"copy_log_web_{datetime.now().strftime('%Y%m%d')}.log"
 
-                headers = {
-                    "Authorization": f"Bearer {api_key.strip()}",
-                    "Content-Type": "application/json",
-                }
+            for prod in products:
+                with st.status(f"🤖 正在处理「{prod}」...", expanded=True) as status:
+                    # 阶段1：规划
+                    st.write("🧠 规划中...")
+                    plan = call_api(api_key, model_id, get_plan_prompt(style, prod), max_tokens=300)
+                    st.write(f"📋 规划完成：{plan[:50]}...")
 
-                for prod in products:
+                    # 阶段2：生成
+                    st.write("✍️ 生成中...")
                     prompt = get_prompt(style, prod)
-                    data = {
-                        "model": model_id,
-                        "messages": [{"role": "user", "content": prompt}],
-                        "max_tokens": 800,
-                    }
+                    content = call_api(api_key, model_id, prompt, max_tokens=1000)
+                    if content.startswith("❌"):
+                        status.update(label=f"❌ 「{prod}」生成失败", state="error")
+                        all_results.append((prod, content))
+                        agent_info.append({"plan": plan, "score": 0, "rewrite_count": 0, "feedback": ""})
+                        append_copy_log(log_filename, prod, style, model_label, content)
+                        fail_count += 1
+                        continue
 
-                    response = None
-                    last_exception = None
-                    success = False
+                    # 阶段3：评估与重写循环
+                    rewrite_count = 0
+                    eval_score = 0
+                    feedback = ""
+                    passed = False
 
-                    for attempt in range(MAX_RETRIES):
+                    while rewrite_count < MAX_REWRITE_ATTEMPTS and not passed:
+                        st.write("🔍 评估中...")
+                        eval_result = call_api(api_key, model_id, get_eval_prompt(style, prod, content), max_tokens=300)
+                        
                         try:
-                            response = requests.post(
-                                API_URL,
-                                headers=headers,
-                                json=data,
-                                timeout=REQUEST_TIMEOUT,
-                            )
-                            if response.status_code == 200:
-                                success = True
-                                break
-                            elif response.status_code in [500, 502, 503, 504]:
-                                time.sleep(RETRY_DELAY * (attempt + 1))
-                                continue
-                            else:
-                                break
-                        except requests.RequestException as e:
-                            last_exception = e
-                            if attempt < MAX_RETRIES - 1:
-                                time.sleep(RETRY_DELAY * (attempt + 1))
-                                continue
+                            eval_data = eval_result.replace("```json", "").replace("```", "").strip()
+                            eval_json = eval_data
+                            import json
+                            eval_obj = json.loads(eval_json)
+                            eval_score = eval_obj.get("score", 0)
+                            passed = eval_obj.get("pass", False)
+                            feedback = eval_obj.get("feedback", "")
+                        except:
+                            passed = True
+
+                        if passed:
+                            st.write(f"✅ 评估通过（分数：{eval_score}）")
                             break
 
-                    if success:
-                        try:
-                            result = response.json()
-                            ai_reply = result["choices"][0]["message"]["content"]
-                            all_results.append((prod, ai_reply))
-                            append_copy_log(log_filename, prod, style, model_label, ai_reply)
-                            ok_count += 1
-                        except (KeyError, IndexError, TypeError, ValueError) as e:
-                            err_msg = f"❌ 响应解析失败：{e}"
-                            all_results.append((prod, err_msg))
-                            append_copy_log(log_filename, prod, style, model_label, err_msg)
-                            fail_count += 1
-                    else:
-                        if response is not None:
-                            err_msg = parse_api_error(response)
-                        else:
-                            err_msg = f"❌ 网络请求失败：{last_exception}"
-                        all_results.append((prod, err_msg))
-                        append_copy_log(log_filename, prod, style, model_label, err_msg)
-                        fail_count += 1
+                        rewrite_count += 1
+                        st.write(f"🔄 重写中（第 {rewrite_count} 次）...")
+                        content = call_api(api_key, model_id, get_rewrite_prompt(style, prod, content, feedback), max_tokens=1000)
+                        if content.startswith("❌"):
+                            break
+
+                    if rewrite_count > 0:
+                        st.write(f"📝 共重写 {rewrite_count} 次")
+                    status.update(label=f"✅ 「{prod}」完成", state="complete")
+
+                    all_results.append((prod, content))
+                    agent_info.append({
+                        "plan": plan,
+                        "score": eval_score,
+                        "rewrite_count": rewrite_count,
+                        "feedback": feedback
+                    })
+                    append_copy_log(log_filename, prod, style, model_label, content)
+                    ok_count += 1
 
             # 保存到 session_state
             st.session_state.all_results = all_results
+            st.session_state.agent_info = agent_info
             st.session_state.ok_count = ok_count
             st.session_state.fail_count = fail_count
             st.session_state.batch_id = batch_id
@@ -362,6 +456,17 @@ if st.session_state.all_results:
 
     for idx, (prod, content) in enumerate(all_results):
         with st.expander(f"📦 {prod}", expanded=True):
+            if "agent_info" in st.session_state and idx < len(st.session_state.agent_info):
+                info = st.session_state.agent_info[idx]
+                st.markdown(f"**📊 评估分数：{info['score']}/15**")
+                st.markdown(f"**🔄 重写次数：{info['rewrite_count']}次**")
+                if info['plan'] and not info['plan'].startswith("❌"):
+                    with st.expander("📋 规划摘要"):
+                        st.markdown(info['plan'])
+                if info['feedback']:
+                    with st.expander("💡 评估反馈"):
+                        st.markdown(info['feedback'])
+                st.markdown("---")
             st.markdown(content)
 
     if ok_count > 0:
